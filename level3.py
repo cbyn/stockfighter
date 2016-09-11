@@ -61,9 +61,8 @@ class MarketMaker:
         # Remove from open orders
         self.open_orders.pop(direction, None)
 
-    def update_price_history(self):
+    def update_price_history(self, quote):
         '''Add latest quote to price history'''
-        quote = self.get_quote()
         price = int(quote.get('last', 0))
         volume = int(quote.get('lastSize', 0))
         time = quote.get('lastTrade', '')
@@ -75,7 +74,7 @@ class MarketMaker:
                     self.price_history = \
                         self.price_history[-self.history_length:]
 
-    def calculate_fair_price(self):
+    def get_fair_price(self):
         '''Calculate volume-weighted average price of last 10 trades'''
         if len(self.price_history) == self.history_length:
             return sum(t[0]*t[1] for t in self.price_history) \
@@ -86,8 +85,8 @@ class MarketMaker:
         '''Run market making strategy'''
         while True:
             # Get fair price
-            self.update_price_history()
-            fair_price = self.calculate_fair_price()
+            self.update_price_history(self.get_quote())
+            fair_price = self.get_fair_price()
             # If a fair price was calculated and it has changed significantly
             if fair_price > 0 and abs(fair_price - self.fair_price) > 10:
                 self._exectute_cancellations(fair_price)
@@ -117,12 +116,12 @@ class MarketMaker:
                                   self.size - self.position,
                                   'buy',
                                   'limit'))
-        buy_order.start()
         sell_order = Process(target=self.place_order,
                              args=(price + self.edge,
                                    self.position - self.size,
                                    'sell',
                                    'limit'))
+        buy_order.start()
         sell_order.start()
         buy_order.join()
         sell_order.join()
